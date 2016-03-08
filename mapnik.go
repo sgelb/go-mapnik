@@ -67,6 +67,67 @@ func init() {
 	Version.String = C.GoString(C.mapnik_version_string)
 }
 
+// Datasource base type
+type Datasource struct {
+	ds *C.struct__mapnik_datasource_t
+}
+
+// NewDatasource initializes a new Datasource
+func NewDatasource(params map[string]string) *Datasource {
+	p := C.mapnik_parameters()
+	defer C.mapnik_parameters_free(p)
+	for k, v := range params {
+		kcs := C.CString(k)
+		defer C.free(unsafe.Pointer(kcs))
+		vcs := C.CString(v)
+		defer C.free(unsafe.Pointer(vcs))
+		C.mapnik_parameters_set(p, kcs, vcs)
+
+	}
+	return &Datasource{C.mapnik_datasource(p)}
+
+}
+
+// Free deallocates the datasource.
+func (ds *Datasource) Free() {
+	C.mapnik_datasource_free(ds.ds)
+	ds.ds = nil
+
+}
+
+// Layer base type
+type Layer struct {
+	l *C.struct__mapnik_layer_t
+}
+
+// NewLayer initializes a new Layer
+func NewLayer(name string, srs string) *Layer {
+	namecs := C.CString(name)
+	defer C.free(unsafe.Pointer(namecs))
+	srscs := C.CString(srs)
+	defer C.free(unsafe.Pointer(srscs))
+	return &Layer{C.mapnik_layer(namecs, srscs)}
+
+}
+
+// Free deallocates the layer.
+func (l *Layer) Free() {
+	C.mapnik_layer_free(l.l)
+	l.l = nil
+}
+
+// AddStyle adds a style.
+func (l *Layer) AddStyle(stylename string) {
+	cs := C.CString(stylename)
+	defer C.free(unsafe.Pointer(cs))
+	C.mapnik_layer_add_style(l.l, cs)
+}
+
+// SetDatasource sets the datasource.
+func (l *Layer) SetDatasource(ds *Datasource) {
+	C.mapnik_layer_set_datasource(l.l, ds.ds)
+}
+
 // Map base type
 type Map struct {
 	m           *C.struct__mapnik_map_t
@@ -220,6 +281,11 @@ type SelectorFunc func(string) Status
 
 func (f SelectorFunc) Select(layername string) Status {
 	return f(layername)
+}
+
+// AddLayer adds a layer.
+func (m *Map) AddLayer(l *Layer) {
+	C.mapnik_map_add_layer(m.m, l.l)
 }
 
 // SelectLayers enables/disables single layers. LayerSelector or SelectorFunc gets called for each layer.
