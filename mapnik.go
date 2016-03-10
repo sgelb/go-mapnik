@@ -82,17 +82,14 @@ func NewDatasource(params map[string]string) *Datasource {
 		vcs := C.CString(v)
 		defer C.free(unsafe.Pointer(vcs))
 		C.mapnik_parameters_set(p, kcs, vcs)
-
 	}
 	return &Datasource{C.mapnik_datasource(p)}
-
 }
 
 // Free deallocates the datasource.
 func (ds *Datasource) Free() {
 	C.mapnik_datasource_free(ds.ds)
 	ds.ds = nil
-
 }
 
 // Layer base type
@@ -107,7 +104,6 @@ func NewLayer(name string, srs string) *Layer {
 	srscs := C.CString(srs)
 	defer C.free(unsafe.Pointer(srscs))
 	return &Layer{C.mapnik_layer(namecs, srscs)}
-
 }
 
 // Free deallocates the layer.
@@ -154,6 +150,16 @@ func (m *Map) Load(stylesheet string) error {
 	cs := C.CString(stylesheet)
 	defer C.free(unsafe.Pointer(cs))
 	if C.mapnik_map_load(m.m, cs) != 0 {
+		return m.lastError()
+	}
+	return nil
+}
+
+// LoadString reads in a Mapnik map XML string.
+func (m *Map) LoadString(s string) error {
+	cs := C.CString(s)
+	defer C.free(unsafe.Pointer(cs))
+	if C.mapnik_map_load_string(m.m, cs) != 0 {
 		return m.lastError()
 	}
 	return nil
