@@ -221,8 +221,8 @@ func (m *Map) SetBackgroundColor(c color.NRGBA) {
 }
 
 func (m *Map) printLayerStatus() {
-	n := C.mapnik_map_layer_count(m.m)
-	for i := 0; i < int(n); i++ {
+	n := m.CountLayers()
+	for i := 0; i < n; i++ {
 		fmt.Println(
 			C.GoString(C.mapnik_map_layer_name(m.m, C.size_t(i))),
 			C.mapnik_map_layer_is_active(m.m, C.size_t(i)),
@@ -238,9 +238,9 @@ func (m *Map) storeLayerStatus() {
 }
 
 func (m *Map) currentLayerStatus() []bool {
-	n := C.mapnik_map_layer_count(m.m)
+	n := m.CountLayers()
 	active := make([]bool, n)
-	for i := 0; i < int(n); i++ {
+	for i := 0; i < n; i++ {
 		if C.mapnik_map_layer_is_active(m.m, C.size_t(i)) == 1 {
 			active[i] = true
 		}
@@ -252,8 +252,8 @@ func (m *Map) resetLayerStatus() {
 	if len(m.layerStatus) == 0 {
 		return // not stored
 	}
-	n := C.mapnik_map_layer_count(m.m)
-	if int(n) > len(m.layerStatus) {
+	n := m.CountLayers()
+	if n > len(m.layerStatus) {
 		// should not happen
 		return
 	}
@@ -297,8 +297,8 @@ func (m *Map) AddLayer(l *Layer) {
 // SelectLayers enables/disables single layers. LayerSelector or SelectorFunc gets called for each layer.
 func (m *Map) SelectLayers(selector LayerSelector) {
 	m.storeLayerStatus()
-	n := C.mapnik_map_layer_count(m.m)
-	for i := 0; i < int(n); i++ {
+	n := m.CountLayers()
+	for i := 0; i < n; i++ {
 		layerName := C.GoString(C.mapnik_map_layer_name(m.m, C.size_t(i)))
 		switch selector.Select(layerName) {
 		case Include:
@@ -310,7 +310,12 @@ func (m *Map) SelectLayers(selector LayerSelector) {
 	}
 }
 
-// ResetLayer resets all layers to the initial status.
+// CountLayers returns count of layers
+func (m *Map) CountLayers() int {
+	return int(C.mapnik_map_layer_count(m.m))
+}
+
+// ResetLayers resets all layers to the initial status.
 func (m *Map) ResetLayers() {
 	m.resetLayerStatus()
 }
