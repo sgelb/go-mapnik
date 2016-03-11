@@ -31,17 +31,23 @@ func init() {
 }
 
 // RegisterDatasources adds path to the Mapnik plugin search path.
-func RegisterDatasources(path string) {
+func RegisterDatasources(path string) error {
 	cs := C.CString(path)
 	defer C.free(unsafe.Pointer(cs))
-	C.mapnik_register_datasources(cs)
+	if C.mapnik_register_datasources(cs) != 0 {
+		return errors.New("mapnik: " + C.GoString(C.mapnik_register_last_error()))
+	}
+	return nil
 }
 
-// RegisterDatasources adds path to the Mapnik fonts search path.
-func RegisterFonts(path string) {
+// RegisterFonts adds path to the Mapnik fonts search path.
+func RegisterFonts(path string) error {
 	cs := C.CString(path)
 	defer C.free(unsafe.Pointer(cs))
-	C.mapnik_register_fonts(cs)
+	if C.mapnik_register_fonts(cs) != 0 {
+		return errors.New("mapnik: " + C.GoString(C.mapnik_register_last_error()))
+	}
+	return nil
 }
 
 // LogSeverity sets the global log level for Mapnik. Requires a Mapnik build with logging enabled.
