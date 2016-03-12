@@ -196,6 +196,43 @@ func (m *Map) SetSRS(srs string) {
 	C.mapnik_map_set_srs(m.m, cs)
 }
 
+// FixMode defines what mapnik does when the aspect ratio of BBox and map are not 1:1.
+type FixMode int
+
+const (
+	// GrowBBox grows the width or height of the specified geo bbox to fill the map size. Default behaviour.
+	GrowBBox FixMode = iota
+	// GrowCanvas grows the width or height of the map to accomodate the specified geo bbox.
+	GrowCanvas
+	// ShrinkBBox shrinks the width or height of the specified geo bbox to fill the map size.
+	ShrinkBBox
+	// ShrinkCanvas shrinks the width or height of the map to accomodate the specified geo bbox.
+	ShrinkCanvas
+	// AdjustBBoxWidth adjusts the width of the specified geo bbox, leaves height and map size unchanged.
+	AdjustBBoxWidth
+	// AdjustBBoxHeight adjusts the height of the specified geo bbox, leaves width and map size unchanged.
+	AdjustBBoxHeight
+	// AdjustCanvasWidth adjusts the width of the map, leaves height and geo bbox unchanged.
+	AdjustCanvasWidth
+	// AdjustCanvasHeight adjusts the height of the map, leaves width and geo bbox unchanged.
+	AdjustCanvasHeight
+	// Respect does nothing
+	Respect
+)
+
+// SetAspectFixMode sets the aspect fix mode. Set before Resize and ZoomAll/ZoomTo.
+func (m *Map) SetAspectFixMode(f FixMode) error {
+	if C.mapnik_map_set_aspect_fix_mode(m.m, C.int(f)) != 0 {
+		return errors.New("mapnik: " + C.GoString(C.mapnik_register_last_error()))
+	}
+	return nil
+}
+
+// AspectFixMode returns the current aspect fix mode.
+func (m *Map) AspectFixMode() FixMode {
+	return FixMode(C.mapnik_map_get_aspect_fix_mode(m.m))
+}
+
 // ScaleDenominator returns the current scale denominator. Call after Resize and ZoomAll/ZoomTo.
 func (m *Map) ScaleDenominator() float64 {
 	return float64(C.mapnik_map_get_scale_denominator(m.m))
@@ -263,7 +300,7 @@ func (m *Map) resetLayerStatus() {
 		// should not happen
 		return
 	}
-	for i := 0; i < int(n); i++ {
+	for i := 0; i < n; i++ {
 		if m.layerStatus[i] {
 			C.mapnik_map_layer_set_active(m.m, C.size_t(i), 1)
 		} else {

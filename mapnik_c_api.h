@@ -97,6 +97,9 @@ MAPNIKCAPICALL int mapnik_map_load_string(mapnik_map_t *m, const char* s);
 
 MAPNIKCAPICALL const char * mapnik_map_get_srs(mapnik_map_t * m);
 MAPNIKCAPICALL int mapnik_map_set_srs(mapnik_map_t * m, const char* srs);
+MAPNIKCAPICALL int mapnik_map_set_aspect_fix_mode(mapnik_map_t * m, int afm);
+MAPNIKCAPICALL int mapnik_map_get_aspect_fix_mode(mapnik_map_t * m);
+
 MAPNIKCAPICALL void mapnik_map_resize(mapnik_map_t * m, unsigned int width, unsigned int height);
 MAPNIKCAPICALL double mapnik_map_get_scale_denominator(mapnik_map_t * m);
 MAPNIKCAPICALL void mapnik_map_set_buffer_size(mapnik_map_t * m, int buffer_size);

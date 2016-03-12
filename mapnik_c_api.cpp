@@ -151,6 +151,21 @@ int mapnik_map_set_srs(mapnik_map_t * m, const char* srs) {
     return -1;
 }
 
+int mapnik_map_get_aspect_fix_mode(mapnik_map_t * m) {
+    if (m) {
+        return m->m->get_aspect_fix_mode();
+    }
+    return -1;
+}
+
+int mapnik_map_set_aspect_fix_mode(mapnik_map_t * m, int afm) {
+    if (m) {
+        m->m->set_aspect_fix_mode(static_cast<mapnik::Map::aspect_fix_mode>(afm));
+        return 0;
+    }
+    return -1;
+}
+
 double mapnik_map_get_scale_denominator(mapnik_map_t * m) {
     if (m && m->m) {
         return m->m->scale_denominator();
