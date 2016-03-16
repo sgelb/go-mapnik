@@ -187,11 +187,11 @@ int mapnik_map_load(mapnik_map_t * m, const char* stylesheet) {
     return -1;
 }
 
-int mapnik_map_load_string(mapnik_map_t *m, const char* s) {
+int mapnik_map_load_string(mapnik_map_t *m, const char* s, const char* base_path) {
     mapnik_map_reset_last_error(m);
     if (m && m->m) {
         try {
-            mapnik::load_map_string(*(m->m), s);
+            mapnik::load_map_string(*(m->m), s, 0, std::string(base_path));
         } catch (std::exception const& ex) {
             m->err = new std::string(ex.what());
             return -1;

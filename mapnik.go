@@ -161,11 +161,13 @@ func (m *Map) Load(stylesheet string) error {
 	return nil
 }
 
-// LoadString reads in a Mapnik map XML string.
-func (m *Map) LoadString(s string) error {
+// LoadString reads in a Mapnik map from a XML string.
+func (m *Map) LoadString(s string, basePath string) error {
 	cs := C.CString(s)
 	defer C.free(unsafe.Pointer(cs))
-	if C.mapnik_map_load_string(m.m, cs) != 0 {
+	bs := C.CString(basePath)
+	defer C.free(unsafe.Pointer(bs))
+	if C.mapnik_map_load_string(m.m, cs, bs) != 0 {
 		return m.lastError()
 	}
 	return nil
