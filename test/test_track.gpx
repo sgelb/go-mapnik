@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx xmlns="http://www.topografix.com/GPX/1/1" creator="MTK - http://www.toursprung.com" version="1.1"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
+  <metadata>
+      <name><![CDATA[Test]]></name>
+
+   </metadata>
+
+      <trk><name><![CDATA[Test]]></name><trkseg>
+        <trkpt lat="53.558914" lon="9.945955"><ele>24</ele></trkpt>
+        <trkpt lat="53.558846" lon="9.945698"><ele>24</ele></trkpt>
+        <trkpt lat="53.558746" lon="9.945518"><ele>24</ele></trkpt>
+        <trkpt lat="53.55862" lon="9.945392"><ele>24</ele></trkpt>
+      </trkseg></trk>
+</gpx>
+
