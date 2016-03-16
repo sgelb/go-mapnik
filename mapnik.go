@@ -31,17 +31,23 @@ func init() {
 }
 
 // RegisterDatasources adds path to the Mapnik plugin search path.
-func RegisterDatasources(path string) {
+func RegisterDatasources(path string) error {
 	cs := C.CString(path)
 	defer C.free(unsafe.Pointer(cs))
-	C.mapnik_register_datasources(cs)
+	if C.mapnik_register_datasources(cs) != 0 {
+		return errors.New("mapnik: " + C.GoString(C.mapnik_register_last_error()))
+	}
+	return nil
 }
 
-// RegisterDatasources adds path to the Mapnik fonts search path.
-func RegisterFonts(path string) {
+// RegisterFonts adds path to the Mapnik fonts search path.
+func RegisterFonts(path string) error {
 	cs := C.CString(path)
 	defer C.free(unsafe.Pointer(cs))
-	C.mapnik_register_fonts(cs)
+	if C.mapnik_register_fonts(cs) != 0 {
+		return errors.New("mapnik: " + C.GoString(C.mapnik_register_last_error()))
+	}
+	return nil
 }
 
 // LogSeverity sets the global log level for Mapnik. Requires a Mapnik build with logging enabled.
@@ -65,6 +71,63 @@ func init() {
 	Version.Minor = int(C.mapnik_version_minor)
 	Version.Patch = int(C.mapnik_version_patch)
 	Version.String = C.GoString(C.mapnik_version_string)
+}
+
+// Datasource base type
+type Datasource struct {
+	ds *C.struct__mapnik_datasource_t
+}
+
+// NewDatasource initializes a new Datasource
+func NewDatasource(params map[string]string) *Datasource {
+	p := C.mapnik_parameters()
+	defer C.mapnik_parameters_free(p)
+	for k, v := range params {
+		kcs := C.CString(k)
+		defer C.free(unsafe.Pointer(kcs))
+		vcs := C.CString(v)
+		defer C.free(unsafe.Pointer(vcs))
+		C.mapnik_parameters_set(p, kcs, vcs)
+	}
+	return &Datasource{C.mapnik_datasource(p)}
+}
+
+// Free deallocates the datasource.
+func (ds *Datasource) Free() {
+	C.mapnik_datasource_free(ds.ds)
+	ds.ds = nil
+}
+
+// Layer base type
+type Layer struct {
+	l *C.struct__mapnik_layer_t
+}
+
+// NewLayer initializes a new Layer
+func NewLayer(name string, srs string) *Layer {
+	namecs := C.CString(name)
+	defer C.free(unsafe.Pointer(namecs))
+	srscs := C.CString(srs)
+	defer C.free(unsafe.Pointer(srscs))
+	return &Layer{C.mapnik_layer(namecs, srscs)}
+}
+
+// Free deallocates the layer.
+func (l *Layer) Free() {
+	C.mapnik_layer_free(l.l)
+	l.l = nil
+}
+
+// AddStyle adds a style.
+func (l *Layer) AddStyle(stylename string) {
+	cs := C.CString(stylename)
+	defer C.free(unsafe.Pointer(cs))
+	C.mapnik_layer_add_style(l.l, cs)
+}
+
+// SetDatasource sets the datasource.
+func (l *Layer) SetDatasource(ds *Datasource) {
+	C.mapnik_layer_set_datasource(l.l, ds.ds)
 }
 
 // Map base type
@@ -98,6 +161,18 @@ func (m *Map) Load(stylesheet string) error {
 	return nil
 }
 
+// LoadString reads in a Mapnik map from a XML string.
+func (m *Map) LoadString(s string, basePath string) error {
+	cs := C.CString(s)
+	defer C.free(unsafe.Pointer(cs))
+	bs := C.CString(basePath)
+	defer C.free(unsafe.Pointer(bs))
+	if C.mapnik_map_load_string(m.m, cs, bs) != 0 {
+		return m.lastError()
+	}
+	return nil
+}
+
 // Resize changes the map size in pixel.
 func (m *Map) Resize(width, height int) {
 	C.mapnik_map_resize(m.m, C.uint(width), C.uint(height))
@@ -121,6 +196,43 @@ func (m *Map) SetSRS(srs string) {
 	cs := C.CString(srs)
 	defer C.free(unsafe.Pointer(cs))
 	C.mapnik_map_set_srs(m.m, cs)
+}
+
+// FixMode defines what mapnik does when the aspect ratio of BBox and map are not 1:1.
+type FixMode int
+
+const (
+	// GrowBBox grows the width or height of the specified geo bbox to fill the map size. Default behaviour.
+	GrowBBox FixMode = iota
+	// GrowCanvas grows the width or height of the map to accomodate the specified geo bbox.
+	GrowCanvas
+	// ShrinkBBox shrinks the width or height of the specified geo bbox to fill the map size.
+	ShrinkBBox
+	// ShrinkCanvas shrinks the width or height of the map to accomodate the specified geo bbox.
+	ShrinkCanvas
+	// AdjustBBoxWidth adjusts the width of the specified geo bbox, leaves height and map size unchanged.
+	AdjustBBoxWidth
+	// AdjustBBoxHeight adjusts the height of the specified geo bbox, leaves width and map size unchanged.
+	AdjustBBoxHeight
+	// AdjustCanvasWidth adjusts the width of the map, leaves height and geo bbox unchanged.
+	AdjustCanvasWidth
+	// AdjustCanvasHeight adjusts the height of the map, leaves width and geo bbox unchanged.
+	AdjustCanvasHeight
+	// Respect does nothing
+	Respect
+)
+
+// SetAspectFixMode sets the aspect fix mode. Set before Resize and ZoomAll/ZoomTo.
+func (m *Map) SetAspectFixMode(f FixMode) error {
+	if C.mapnik_map_set_aspect_fix_mode(m.m, C.int(f)) != 0 {
+		return errors.New("mapnik: " + C.GoString(C.mapnik_register_last_error()))
+	}
+	return nil
+}
+
+// AspectFixMode returns the current aspect fix mode.
+func (m *Map) AspectFixMode() FixMode {
+	return FixMode(C.mapnik_map_get_aspect_fix_mode(m.m))
 }
 
 // ScaleDenominator returns the current scale denominator. Call after Resize and ZoomAll/ZoomTo.
@@ -154,8 +266,8 @@ func (m *Map) SetBackgroundColor(c color.NRGBA) {
 }
 
 func (m *Map) printLayerStatus() {
-	n := C.mapnik_map_layer_count(m.m)
-	for i := 0; i < int(n); i++ {
+	n := m.CountLayers()
+	for i := 0; i < n; i++ {
 		fmt.Println(
 			C.GoString(C.mapnik_map_layer_name(m.m, C.size_t(i))),
 			C.mapnik_map_layer_is_active(m.m, C.size_t(i)),
@@ -171,9 +283,9 @@ func (m *Map) storeLayerStatus() {
 }
 
 func (m *Map) currentLayerStatus() []bool {
-	n := C.mapnik_map_layer_count(m.m)
+	n := m.CountLayers()
 	active := make([]bool, n)
-	for i := 0; i < int(n); i++ {
+	for i := 0; i < n; i++ {
 		if C.mapnik_map_layer_is_active(m.m, C.size_t(i)) == 1 {
 			active[i] = true
 		}
@@ -185,12 +297,12 @@ func (m *Map) resetLayerStatus() {
 	if len(m.layerStatus) == 0 {
 		return // not stored
 	}
-	n := C.mapnik_map_layer_count(m.m)
-	if int(n) > len(m.layerStatus) {
+	n := m.CountLayers()
+	if n > len(m.layerStatus) {
 		// should not happen
 		return
 	}
-	for i := 0; i < int(n); i++ {
+	for i := 0; i < n; i++ {
 		if m.layerStatus[i] {
 			C.mapnik_map_layer_set_active(m.m, C.size_t(i), 1)
 		} else {
@@ -222,11 +334,16 @@ func (f SelectorFunc) Select(layername string) Status {
 	return f(layername)
 }
 
+// AddLayer adds a layer.
+func (m *Map) AddLayer(l *Layer) {
+	C.mapnik_map_add_layer(m.m, l.l)
+}
+
 // SelectLayers enables/disables single layers. LayerSelector or SelectorFunc gets called for each layer.
 func (m *Map) SelectLayers(selector LayerSelector) {
 	m.storeLayerStatus()
-	n := C.mapnik_map_layer_count(m.m)
-	for i := 0; i < int(n); i++ {
+	n := m.CountLayers()
+	for i := 0; i < n; i++ {
 		layerName := C.GoString(C.mapnik_map_layer_name(m.m, C.size_t(i)))
 		switch selector.Select(layerName) {
 		case Include:
@@ -238,7 +355,12 @@ func (m *Map) SelectLayers(selector LayerSelector) {
 	}
 }
 
-// ResetLayer resets all layers to the initial status.
+// CountLayers returns count of layers
+func (m *Map) CountLayers() int {
+	return int(C.mapnik_map_layer_count(m.m))
+}
+
+// ResetLayers resets all layers to the initial status.
 func (m *Map) ResetLayers() {
 	m.resetLayerStatus()
 }

@@ -29,6 +29,58 @@ func TestMap(t *testing.T) {
 	if img.Rect.Dx() != 800 || img.Rect.Dy() != 600 {
 		t.Error("unexpected size of output image: ", img.Rect)
 	}
+
+	m.Free()
+	if m.m != nil {
+		t.Error("deallocated map should be nil")
+	}
+}
+
+func TestMapLoad(t *testing.T) {
+	m := New()
+	xml, _ := ioutil.ReadFile("test/map.xml")
+	if err := m.LoadString(string(xml), "test"); err != nil {
+		t.Fatal(err)
+	}
+
+	m.ZoomAll()
+	img, err := m.RenderImage(RenderOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if img.Rect.Dx() != 800 || img.Rect.Dy() != 600 {
+		t.Error("unexpected size of output image: ", img.Rect)
+	}
+
+	m.Free()
+	if m.m != nil {
+		t.Error("deallocated map should be nil")
+	}
+}
+
+func TestDatasource(t *testing.T) {
+	p := map[string]string{"file": "test/test_track.gpx", "layer": "tracks", "type": "ogr"}
+	d := NewDatasource(p)
+	if d.ds == nil {
+		t.Error("did not create new datasource")
+	}
+
+	d.Free()
+	if d.ds != nil {
+		t.Error("deallocated database should be nil")
+	}
+}
+
+func TestLayer(t *testing.T) {
+	l := NewLayer("test", "+init=epsg:4326")
+	if l.l == nil {
+		t.Error("did not create new layer")
+	}
+
+	l.Free()
+	if l.l != nil {
+		t.Error("deallocated layer should be nil")
+	}
 }
 
 func TestRenderFile(t *testing.T) {
@@ -76,7 +128,7 @@ func TestRenderInvalidFormat(t *testing.T) {
 
 func TestSRS(t *testing.T) {
 	m := New()
-	// default mapnil srs
+	// default mapnik srs
 	if srs := m.SRS(); srs != "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs" {
 		t.Fatal("unexpected default srs:", srs)
 	}
@@ -90,6 +142,21 @@ func TestSRS(t *testing.T) {
 	if m.SRS() != "+init=epsg:3857" {
 		t.Error("unexpeced srs: ", m.SRS())
 	}
+}
+
+func TestAspectFixMode(t *testing.T) {
+	m := New()
+
+	if m.AspectFixMode() != GrowBBox {
+		t.Error("unexpeced default fixmode: ", m.AspectFixMode())
+	}
+
+	m.SetAspectFixMode(Respect)
+
+	if m.AspectFixMode() != Respect {
+		t.Error("unexpeced fixmode: ", m.AspectFixMode())
+	}
+
 }
 
 func TestBackgroundColor(t *testing.T) {
@@ -175,12 +242,23 @@ func TestLayerStatus(t *testing.T) {
 		t.Error("default layer status not nil")
 	}
 
-	if !reflect.DeepEqual(m.currentLayerStatus(), []bool{true, true, true, false}) {
-		t.Error("unexpected layer status", m.currentLayerStatus())
+	results := make([][]bool, 2)
+	results[0] = []bool{true, true, true}
+	results[1] = []bool{false, true, true}
+
+	if Version.Major < 3 {
+		// Mapnik v2 also returns Layers with status=off
+		for i := range results {
+			results[i] = append(results[i], false)
+		}
+	}
+
+	if !reflect.DeepEqual(m.currentLayerStatus(), results[0]) {
+		t.Error("unexpected layer status", m.currentLayerStatus(), results[0])
 	}
 
 	m.storeLayerStatus()
-	if !reflect.DeepEqual(m.layerStatus, []bool{true, true, true, false}) {
+	if !reflect.DeepEqual(m.layerStatus, results[0]) {
 		t.Error("unexpected layer status", m.layerStatus)
 	}
 	m.resetLayerStatus()
@@ -196,10 +274,10 @@ func TestLayerStatus(t *testing.T) {
 	}}
 
 	m.SelectLayers(&ts)
-	if !reflect.DeepEqual(m.layerStatus, []bool{true, true, true, false}) {
+	if !reflect.DeepEqual(m.layerStatus, results[0]) {
 		t.Error("unexpected layer status", m.layerStatus)
 	}
-	if !reflect.DeepEqual(m.currentLayerStatus(), []bool{false, true, true, false}) {
+	if !reflect.DeepEqual(m.currentLayerStatus(), results[1]) {
 		t.Error("unexpected layer status", m.currentLayerStatus())
 	}
 
@@ -207,10 +285,9 @@ func TestLayerStatus(t *testing.T) {
 	if m.layerStatus != nil {
 		t.Error("unexpected layer status", m.layerStatus)
 	}
-	if !reflect.DeepEqual(m.currentLayerStatus(), []bool{true, true, true, false}) {
+	if !reflect.DeepEqual(m.currentLayerStatus(), results[0]) {
 		t.Error("unexpected layer status", m.currentLayerStatus())
 	}
-
 }
 
 func prepareImg(t testing.TB) *image.NRGBA {

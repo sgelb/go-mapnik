@@ -9,6 +9,7 @@
 #include <mapnik/image_util.hpp>
 #include <mapnik/agg_renderer.hpp>
 #include <mapnik/load_map.hpp>
+#include <mapnik/datasource.hpp>
 #include <mapnik/datasource_cache.hpp>
 #include <mapnik/font_engine_freetype.hpp>
 
@@ -37,9 +38,9 @@ const int mapnik_version_minor = MAPNIK_MINOR_VERSION;
 const int mapnik_version_patch = MAPNIK_PATCH_VERSION;
 
 #ifdef MAPNIK_2
-    typedef mapnik::image_32 mapnik_rgba_image;
+typedef mapnik::image_32 mapnik_rgba_image;
 #else
-    typedef mapnik::image_rgba8 mapnik_rgba_image;
+typedef mapnik::image_rgba8 mapnik_rgba_image;
 #endif
 
 
@@ -150,6 +151,21 @@ int mapnik_map_set_srs(mapnik_map_t * m, const char* srs) {
     return -1;
 }
 
+int mapnik_map_get_aspect_fix_mode(mapnik_map_t * m) {
+    if (m) {
+        return m->m->get_aspect_fix_mode();
+    }
+    return -1;
+}
+
+int mapnik_map_set_aspect_fix_mode(mapnik_map_t * m, int afm) {
+    if (m) {
+        m->m->set_aspect_fix_mode(static_cast<mapnik::Map::aspect_fix_mode>(afm));
+        return 0;
+    }
+    return -1;
+}
+
 double mapnik_map_get_scale_denominator(mapnik_map_t * m) {
     if (m && m->m) {
         return m->m->scale_denominator();
@@ -170,6 +186,21 @@ int mapnik_map_load(mapnik_map_t * m, const char* stylesheet) {
     }
     return -1;
 }
+
+int mapnik_map_load_string(mapnik_map_t *m, const char* s, const char* base_path) {
+    mapnik_map_reset_last_error(m);
+    if (m && m->m) {
+        try {
+            mapnik::load_map_string(*(m->m), s, 0, std::string(base_path));
+        } catch (std::exception const& ex) {
+            m->err = new std::string(ex.what());
+            return -1;
+        }
+        return 0;
+    }
+    return -1;
+}
+
 
 int mapnik_map_zoom_all(mapnik_map_t * m) {
     mapnik_map_reset_last_error(m);
@@ -353,6 +384,95 @@ mapnik_image_t * mapnik_image_from_raw(const uint8_t * raw, int width, int heigh
 #endif
     img->err = NULL;
     return img;
+}
+
+struct _mapnik_parameters_t {
+    mapnik::parameters *p;
+};
+
+mapnik_parameters_t *mapnik_parameters() {
+    mapnik_parameters_t *params = new mapnik_parameters_t;
+    params->p = new mapnik::parameters;
+    return params;
+}
+
+void mapnik_parameters_free(mapnik_parameters_t *p) {
+    if (p) {
+        if (p->p) {
+            delete p->p;
+        }
+        delete p;
+    }
+}
+
+void mapnik_parameters_set(mapnik_parameters_t *p, const char *key, const char *value) {
+    if (p && p->p) {
+        (*(p->p))[key] = value;
+    }
+}
+
+struct _mapnik_datasource_t {
+    mapnik::datasource_ptr ds;
+};
+
+mapnik_datasource_t *mapnik_datasource(mapnik_parameters_t *p) {
+    if (p && p->p) {
+        mapnik_datasource_t *ds = new mapnik_datasource_t;
+#if MAPNIK_VERSION >= 200200
+        ds->ds = mapnik::datasource_cache::instance().create(*(p->p));
+#else
+        ds->ds = mapnik::datasource_cache::instance()->create(*(p->p));
+#endif
+        return ds;
+    }
+    return NULL;
+}
+
+void mapnik_datasource_free(mapnik_datasource_t *ds) {
+    if (ds) {
+        delete ds;
+    }
+}
+
+struct _mapnik_layer_t {
+    mapnik::layer *l;
+};
+
+mapnik_layer_t *mapnik_layer(const char *name, const char *srs) {
+    mapnik_layer_t *l = new mapnik_layer_t;
+    l->l = new mapnik::layer(name, srs);
+    return l;
+}
+
+void mapnik_layer_free(mapnik_layer_t *l) {
+    if (l)  {
+        if (l->l) {
+            delete l->l;
+        }
+        delete l;
+    }
+}
+
+void mapnik_layer_add_style(mapnik_layer_t *l, const char *stylename) {
+    if (l && l->l) {
+        l->l->add_style(stylename);
+    }
+}
+
+void mapnik_layer_set_datasource(mapnik_layer_t *l, mapnik_datasource_t *ds) {
+    if (l && l->l && ds && ds->ds) {
+        l->l->set_datasource(ds->ds);
+    }
+}
+
+void mapnik_map_add_layer(mapnik_map_t *m, mapnik_layer_t *l) {
+    if (m && m->m && l && l->l) {
+#if MAPNIK_VERSION >= 300000
+        m->m->add_layer(*(l->l));
+#else
+        m->m->addLayer(*(l->l));
+#endif
+    }
 }
 
 int mapnik_map_layer_count(mapnik_map_t * m) {
